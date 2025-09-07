@@ -1,3 +1,3 @@
-module github.com/crunchydeer30/http-from-tcp
+module github.com/crunchydeer30/httpfromtcp
 
 go 1.24.5
