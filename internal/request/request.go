@@ -21,6 +21,7 @@ const (
 )
 
 const BUFFER_SIZE = 8
+const NEW_LINE = "\r\n"
 
 type Request struct {
 	RequestLine RequestLine
@@ -51,18 +52,21 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 	buf := make([]byte, BUFFER_SIZE)
 	for r.State != DONE {
+		if readToIndex >= len(buf) {
+			newBuf := make([]byte, len(buf)*2)
+			copy(newBuf, buf)
+			buf = newBuf
+		}
+
 		n, err := reader.Read(buf[readToIndex:])
+		readToIndex += n
 
 		if err == io.EOF {
 			r.State = DONE
 			break
 		}
-
-		readToIndex += n
-		if readToIndex >= len(buf) {
-			newBuf := make([]byte, len(buf)*2)
-			copy(newBuf, buf)
-			buf = newBuf
+		if err != nil {
+			return nil, err
 		}
 
 		parsed, err := r.parse(buf[:readToIndex])
@@ -97,7 +101,8 @@ func (r *Request) parse(data []byte) (int, error) {
 }
 
 func (r *Request) parseRequestLine(data []byte) (int, error) {
-	idx := strings.Index(string(data), "\r\n")
+
+	idx := strings.Index(string(data), NEW_LINE)
 
 	if idx == -1 {
 		return 0, nil
@@ -126,5 +131,6 @@ func (r *Request) parseRequestLine(data []byte) (int, error) {
 	}
 
 	r.RequestLine = *rl
-	return len(data), nil
+	consumed := idx + len(NEW_LINE)
+	return consumed, nil
 }
