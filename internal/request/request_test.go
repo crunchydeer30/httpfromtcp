@@ -64,7 +64,7 @@ func TestRequestLinePrase(t *testing.T) {
 	// Test: Good POST request with path
 	reader = &chunkReader{
 		data:            "POST /coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
-		numBytesPerRead: 5,
+		numBytesPerRead: 128,
 	}
 	r, err = RequestFromReader(reader)
 	require.NoError(t, err)
@@ -76,7 +76,7 @@ func TestRequestLinePrase(t *testing.T) {
 	// Test: Invalid version
 	reader = &chunkReader{
 		data:            "GET /coffee HTTP/2.0\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
-		numBytesPerRead: 5,
+		numBytesPerRead: 128,
 	}
 	_, err = RequestFromReader(reader)
 	require.Error(t, err)
@@ -85,7 +85,7 @@ func TestRequestLinePrase(t *testing.T) {
 	// Test: Invalid method
 	reader = &chunkReader{
 		data:            "OPTIONS /coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
-		numBytesPerRead: 5,
+		numBytesPerRead: 32,
 	}
 	_, err = RequestFromReader(reader)
 	require.Error(t, err)

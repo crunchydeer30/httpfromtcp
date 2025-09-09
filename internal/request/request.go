@@ -11,7 +11,6 @@ import (
 var ErrMalformedRequestLine = fmt.Errorf("malformed request line")
 var ErrUnsupportedHttpVersion = fmt.Errorf("unsupported http version")
 var ErrUnsupportedHttpMethod = fmt.Errorf("unsupported http method")
-var separator = "\r\n"
 
 type parserStatus string
 
@@ -74,8 +73,10 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			return nil, err
 		}
 
-		copy(buf, buf[parsed:readToIndex])
-		readToIndex -= parsed
+		if parsed > 0 {
+			copy(buf, buf[parsed:readToIndex])
+			readToIndex -= parsed
+		}
 	}
 
 	return r, nil
