@@ -20,7 +20,7 @@ const (
 )
 
 const BUFFER_SIZE = 8
-const NEW_LINE = "\r\n"
+const CRLF = "\r\n"
 
 type Request struct {
 	RequestLine RequestLine
@@ -102,15 +102,13 @@ func (r *Request) parse(data []byte) (int, error) {
 }
 
 func (r *Request) parseRequestLine(data []byte) (int, error) {
-
-	idx := strings.Index(string(data), NEW_LINE)
+	idx := strings.Index(string(data), CRLF)
 
 	if idx == -1 {
 		return 0, nil
 	}
 
 	requestLine := string(data[:idx])
-
 	parts := strings.Split(requestLine, " ")
 
 	if len(parts) != 3 {
@@ -132,6 +130,6 @@ func (r *Request) parseRequestLine(data []byte) (int, error) {
 	}
 
 	r.RequestLine = *rl
-	consumed := idx + len(NEW_LINE)
+	consumed := idx + len(CRLF)
 	return consumed, nil
 }
