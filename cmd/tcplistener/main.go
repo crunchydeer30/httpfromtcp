@@ -3,10 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"strings"
+
+	"github.com/crunchydeer30/httpfromtcp/internal/request"
 )
 
 var ErrSomethingWentWrong = errors.New("something went wrong")
@@ -28,48 +28,22 @@ func main() {
 		}
 		log.Println("Received connection:", conn.RemoteAddr())
 
-		linesChannel := getLinesChannel(conn)
-		for line := range linesChannel {
-			fmt.Printf("%s\n", line)
-		}
-		log.Println("Connection closed:", conn.RemoteAddr())
+		go handleConnection(conn)
 	}
 }
 
-func getLinesChannel(f io.ReadCloser) <-chan string {
-	lines := make(chan string)
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+	r, err := request.RequestFromReader(conn)
+	if err != nil {
+		fmt.Println("error reading request:", err)
+		return
+	}
 
-	go func() {
-		defer close(lines)
-		defer f.Close()
+	fmt.Printf("Request line:\n- Method: %s\n- Target: %s\n- Version: %s\n",
+		r.RequestLine.Method,
+		r.RequestLine.RequestTarget,
+		r.RequestLine.HttpVersion)
 
-		currentLine := ""
-
-		for {
-			buf := make([]byte, 8)
-			n, err := f.Read(buf)
-
-			if n > 0 {
-				parts := strings.Split(string(buf[:n]), "\n")
-				for i := 0; i < len(parts)-1; i++ {
-					lines <- currentLine + parts[i]
-					currentLine = ""
-				}
-				currentLine += parts[len(parts)-1]
-			}
-
-			if err == io.EOF {
-				if currentLine != "" {
-					lines <- currentLine
-				}
-				break
-			}
-
-			if err != nil {
-				break
-			}
-		}
-	}()
-
-	return lines
+	log.Println("Connection closed:", conn.RemoteAddr())
 }
