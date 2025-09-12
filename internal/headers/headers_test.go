@@ -1,7 +1,6 @@
 package headers
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,7 +60,6 @@ func TestHeadersParser(t *testing.T) {
 			break
 		}
 	}
-	fmt.Println("n", n, "done", done, "err", err)
 	require.NoError(t, err)
 	assert.Equal(t, "application/json", headers.Get("Content-Type"))
 	assert.Equal(t, "localhost:42069", headers.Get("Host"))

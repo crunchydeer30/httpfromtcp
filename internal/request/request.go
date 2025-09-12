@@ -6,26 +6,30 @@ import (
 	"io"
 	"slices"
 	"strings"
+
+	"github.com/crunchydeer30/httpfromtcp/internal/headers"
 )
 
 var ErrMalformedRequestLine = fmt.Errorf("malformed request line")
 var ErrUnsupportedHttpVersion = fmt.Errorf("unsupported http version")
 var ErrUnsupportedHttpMethod = fmt.Errorf("unsupported http method")
+var ErrIncompleteData = fmt.Errorf("incomplete data")
 
 type parserStatus string
 
 const (
 	INITIALIZED     parserStatus = "initialized"
-	PARSING_HEADERS parserStatus = "parsing_headers"
 	DONE            parserStatus = "done"
+	PARSING_HEADERS parserStatus = "parsing_headers"
 )
 
-const BUFFER_SIZE = 8
+const BUFFER_SIZE = 128
 const CRLF = "\r\n"
 
 type Request struct {
 	RequestLine RequestLine
 	State       parserStatus
+	Headers     headers.Headers
 }
 
 type RequestLine struct {
@@ -47,31 +51,42 @@ func (r *RequestLine) ValidHttpVersion() bool {
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	readToIndex := 0
 	r := &Request{
-		State: INITIALIZED,
+		RequestLine: RequestLine{},
+		State:       INITIALIZED,
+		Headers:     headers.NewHeaders(),
 	}
 
 	buf := make([]byte, BUFFER_SIZE)
+	eofReached := false
+
 	for r.State != DONE {
 		if readToIndex >= len(buf) {
 			newBuf := make([]byte, len(buf)*2)
-			copy(newBuf, buf)
+			copy(newBuf, buf[:readToIndex])
 			buf = newBuf
 		}
 
 		n, err := reader.Read(buf[readToIndex:])
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		if err == io.EOF {
+			eofReached = true
+		}
 		readToIndex += n
 
-		if err == io.EOF {
+		if eofReached && readToIndex == 0 {
 			r.State = DONE
 			break
-		}
-		if err != nil {
-			return nil, err
 		}
 
 		parsed, err := r.parse(buf[:readToIndex])
 		if err != nil {
 			return nil, err
+		}
+
+		if parsed == 0 && eofReached {
+			return nil, ErrIncompleteData
 		}
 
 		if parsed > 0 {
@@ -84,6 +99,26 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 }
 
 func (r *Request) parse(data []byte) (int, error) {
+	totalBytesParsed := 0
+	for r.State != DONE {
+		if totalBytesParsed >= len(data) {
+			break
+		}
+
+		n, err := r.parseSingle(data[totalBytesParsed:])
+		if err != nil {
+			return 0, err
+		}
+		if n == 0 {
+			break
+		}
+		totalBytesParsed += n
+	}
+
+	return totalBytesParsed, nil
+}
+
+func (r *Request) parseSingle(data []byte) (int, error) {
 	switch r.State {
 	case INITIALIZED:
 		n, err := r.parseRequestLine(data)
@@ -93,7 +128,17 @@ func (r *Request) parse(data []byte) (int, error) {
 		if n == 0 {
 			return n, nil
 		}
-		r.State = DONE
+		r.State = PARSING_HEADERS
+		return n, nil
+	case PARSING_HEADERS:
+		n, done, err := r.Headers.Parse(data)
+		if err != nil {
+			return 0, err
+		}
+		if done {
+			r.State = DONE
+			return n, nil
+		}
 		return n, nil
 	case DONE:
 		return 0, errors.New("trying to read data in a done state")
@@ -116,40 +161,18 @@ func (r *Request) parseRequestLine(data []byte) (int, error) {
 		return 0, ErrMalformedRequestLine
 	}
 
-	rl := &RequestLine{
-		HttpVersion:   strings.TrimPrefix(parts[2], "HTTP/"),
-		RequestTarget: parts[1],
-		Method:        parts[0],
-	}
+	r.RequestLine.HttpVersion = strings.TrimPrefix(parts[2], "HTTP/")
+	r.RequestLine.RequestTarget = parts[1]
+	r.RequestLine.Method = parts[0]
 
-	if !rl.ValidHttpVersion() {
+	if !r.RequestLine.ValidHttpVersion() {
 		return 0, ErrUnsupportedHttpVersion
 	}
 
-	if !rl.ValidMethod() {
+	if !r.RequestLine.ValidMethod() {
 		return 0, ErrUnsupportedHttpMethod
 	}
 
-	r.RequestLine = *rl
 	consumed := idx + len(CRLF)
 	return consumed, nil
-}
-
-func (r *Request) parseSingle(data []byte) (int, error) {
-	switch r.State {
-	case INITIALIZED:
-		n, err := r.parseRequestLine(data)
-		if err != nil {
-			return 0, err
-		}
-		if n == 0 {
-			return n, nil
-		}
-		r.State = DONE
-		return n, nil
-	case DONE:
-		return 0, errors.New("trying to read data in a done state")
-	default:
-		return 0, errors.New("unknown state")
-	}
 }

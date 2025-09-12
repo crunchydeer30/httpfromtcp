@@ -47,7 +47,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	headerLine := string(data[:idx])
 
 	colonIdx := strings.Index(headerLine, ":")
-	if idx == -1 {
+	if colonIdx == -1 {
 		return 0, false, ErrMalformedHeader
 	}
 
