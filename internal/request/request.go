@@ -15,8 +15,9 @@ var ErrUnsupportedHttpMethod = fmt.Errorf("unsupported http method")
 type parserStatus string
 
 const (
-	INITIALIZED parserStatus = "initialized"
-	DONE        parserStatus = "done"
+	INITIALIZED     parserStatus = "initialized"
+	PARSING_HEADERS parserStatus = "parsing_headers"
+	DONE            parserStatus = "done"
 )
 
 const BUFFER_SIZE = 8
@@ -132,4 +133,23 @@ func (r *Request) parseRequestLine(data []byte) (int, error) {
 	r.RequestLine = *rl
 	consumed := idx + len(CRLF)
 	return consumed, nil
+}
+
+func (r *Request) parseSingle(data []byte) (int, error) {
+	switch r.State {
+	case INITIALIZED:
+		n, err := r.parseRequestLine(data)
+		if err != nil {
+			return 0, err
+		}
+		if n == 0 {
+			return n, nil
+		}
+		r.State = DONE
+		return n, nil
+	case DONE:
+		return 0, errors.New("trying to read data in a done state")
+	default:
+		return 0, errors.New("unknown state")
+	}
 }
