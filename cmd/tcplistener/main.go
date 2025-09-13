@@ -50,5 +50,7 @@ func handleConnection(conn net.Conn) {
 		fmt.Printf("- %s: %s\n", k, v)
 	}
 
+	fmt.Printf("Body:\n%s\n", string(r.Body))
+
 	log.Println("Connection closed:", conn.RemoteAddr())
 }

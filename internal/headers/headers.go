@@ -41,7 +41,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, nil
 	}
 	if idx == 0 {
-		return 0, true, nil
+		return len(CRLF), true, nil
 	}
 
 	headerLine := string(data[:idx])
