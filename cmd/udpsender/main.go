@@ -36,7 +36,7 @@ func main() {
 		}
 		_, err = conn.Write([]byte(line))
 		if err != nil {
-			log.Println("Error whil writing to the UDP connection", conn.RemoteAddr(), err)
+			log.Println("Error while writing to the UDP connection", conn.RemoteAddr(), err)
 			continue
 		}
 	}
