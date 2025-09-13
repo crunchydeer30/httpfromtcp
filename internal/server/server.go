@@ -1,17 +1,23 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"net"
 	"sync/atomic"
+
+	"github.com/crunchydeer30/httpfromtcp/internal/request"
+	"github.com/crunchydeer30/httpfromtcp/internal/response"
 )
 
 type Server struct {
 	listener net.Listener
+	handler  Handler
 	closed   atomic.Bool
 }
 
-func Serve(port int) (*Server, error) {
+func Serve(port int, handler Handler) (*Server, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 
 	if err != nil {
@@ -20,6 +26,7 @@ func Serve(port int) (*Server, error) {
 
 	server := &Server{
 		listener: listener,
+		handler:  handler,
 		closed:   atomic.Bool{},
 	}
 	server.closed.Store(false)
@@ -43,7 +50,7 @@ func (s *Server) listen() {
 			if s.closed.Load() {
 				return
 			}
-			fmt.Println("error accepting TCP connection", err)
+			log.Println("error accepting TCP connection", err)
 			continue
 		}
 		go s.handle(conn)
@@ -53,5 +60,44 @@ func (s *Server) listen() {
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
-	conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 13\r\n\r\nHello World!"))
+	r, err := request.RequestFromReader(conn)
+	if err != nil {
+		log.Println("error reading request:", err)
+		handlerError := &HandlerError{
+			StatusCode: response.BAD_REQUEST,
+			Message:    err.Error(),
+		}
+		WriteHandlerError(conn, handlerError)
+		return
+	}
+
+	handlerBuffer := bytes.NewBuffer([]byte{})
+
+	if s.handler != nil {
+		handlerError := s.handler(handlerBuffer, r)
+		if handlerError != nil {
+			WriteHandlerError(conn, handlerError)
+			return
+		}
+	}
+
+	headers := response.GetDefaultHeaders(handlerBuffer.Len())
+
+	err = response.WriteStatusLine(conn, response.OK)
+	if err != nil {
+		log.Println("error writing status line:", err)
+		return
+	}
+
+	err = response.WriteHeaders(conn, headers)
+	if err != nil {
+		log.Println("error writing headers:", err)
+		return
+	}
+
+	err = response.WriteBody(conn, handlerBuffer.String())
+	if err != nil {
+		log.Println("error writing body:", err)
+		return
+	}
 }

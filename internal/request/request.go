@@ -151,6 +151,14 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 			return 0, err
 		}
 		if done {
+			contentLength, err := r.getContentLength()
+			if err != nil {
+				return 0, err
+			}
+			if contentLength == 0 {
+				r.State = DONE
+				return n, nil
+			}
 			r.State = PARSING_BODY
 			return n, nil
 		}
