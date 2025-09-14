@@ -69,5 +69,6 @@ func (s *Server) handle(conn net.Conn) {
 	}
 
 	s.handler(responseWriter, r)
+
 	responseWriter.Finalize()
 }

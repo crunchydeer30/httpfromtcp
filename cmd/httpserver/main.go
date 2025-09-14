@@ -1,7 +1,9 @@
 package main
 
 import (
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,7 +16,7 @@ import (
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port, handler)
+	server, err := server.Serve(port, streamHandler)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
@@ -32,4 +34,30 @@ func handler(w *response.ResponseWriter, req *request.Request) {
 	w.Headers.Set("X-Test", "123")
 	w.Headers.Set("Content-Type", "text/html")
 	w.Write([]byte("<html><head><title>200 OK</title></head><body><h1>Success!</h1><p>Your request was an absolute banger.</p></body></html>"))
+}
+
+func streamHandler(w *response.ResponseWriter, req *request.Request) {
+	res, err := http.Get("https://httpbin.org/stream/100")
+	if err != nil {
+		w.WriteStatusLine(response.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	defer res.Body.Close()
+
+	w.WriteStatusLine(response.StatusOK)
+	w.Headers.Set("Transfer-Encoding", "chunked")
+	w.Headers.Replace("content-type", "application/json")
+
+	for {
+		data := make([]byte, 32)
+		_, err := res.Body.Read(data)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+		}
+		w.WriteChunkedBody(data)
+	}
+	w.WriteChunkedBodyDone()
 }

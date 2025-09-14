@@ -12,6 +12,8 @@ import (
 
 type ResponseWriterState string
 
+const CRLF = "\r\n"
+
 const (
 	WaitingForStatusLine ResponseWriterState = "WaitingForStatusLine"
 	WaitingForHeaders    ResponseWriterState = "WaitingForHeaders"
@@ -94,7 +96,22 @@ func (w *ResponseWriter) SetDefaultHeaders(contentLen int) {
 	if w.Headers.Get("Connection") == "" {
 		w.Headers.Set("Connection", "close")
 	}
+	if w.Headers.Get("Transfer-Encoding") == "chunked" {
+		w.Headers.Delete("Content-Length")
+		w.Headers.Delete("Connection")
+	}
 	if w.Headers.Get("Content-Type") == "" {
 		w.Headers.Set("Content-Type", "text/plain")
 	}
+}
+
+func (w *ResponseWriter) WriteChunkedBody(p []byte) (int, error) {
+	w.Write([]byte(fmt.Sprintf("%x\r\n%s\r\n", len(p), p)))
+
+	return len(p), nil
+}
+
+func (w *ResponseWriter) WriteChunkedBodyDone() (int, error) {
+	w.Write([]byte("0\r\n\r\n"))
+	return 0, nil
 }
