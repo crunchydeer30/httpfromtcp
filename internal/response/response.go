@@ -82,7 +82,9 @@ func (w *ResponseWriter) Write(p []byte) error {
 }
 
 func (w *ResponseWriter) WriteTrailers(h headers.Headers) {
-
+	for k, v := range h {
+		w.conn.Write([]byte(k + ": " + v + "\r\n"))
+	}
 }
 
 func (w *ResponseWriter) Finalize() error {
@@ -116,6 +118,7 @@ func (w *ResponseWriter) WriteChunkedBody(p []byte) (int, error) {
 }
 
 func (w *ResponseWriter) WriteChunkedBodyDone() (int, error) {
-	w.conn.Write([]byte("0\r\n\r\n"))
-	return 0, nil
+	done := []byte("0\r\n")
+	w.conn.Write(done)
+	return len(done), nil
 }
