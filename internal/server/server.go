@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"net"
@@ -10,6 +9,8 @@ import (
 	"github.com/crunchydeer30/httpfromtcp/internal/request"
 	"github.com/crunchydeer30/httpfromtcp/internal/response"
 )
+
+type Handler func(w *response.ResponseWriter, req *request.Request)
 
 type Server struct {
 	listener net.Listener
@@ -43,9 +44,6 @@ func (s *Server) Close() error {
 func (s *Server) listen() {
 	for {
 		conn, err := s.listener.Accept()
-		if conn == nil {
-			continue
-		}
 		if err != nil {
 			if s.closed.Load() {
 				return
@@ -60,44 +58,16 @@ func (s *Server) listen() {
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
 
+	responseWriter := response.NewResponseWriter(conn)
+
 	r, err := request.RequestFromReader(conn)
 	if err != nil {
 		log.Println("error reading request:", err)
-		handlerError := &HandlerError{
-			StatusCode: response.BAD_REQUEST,
-			Message:    err.Error(),
-		}
-		WriteHandlerError(conn, handlerError)
+		responseWriter.WriteStatusLine(response.StatusBadRequest)
+		responseWriter.WriteHeaders()
 		return
 	}
 
-	handlerBuffer := bytes.NewBuffer([]byte{})
-
-	if s.handler != nil {
-		handlerError := s.handler(handlerBuffer, r)
-		if handlerError != nil {
-			WriteHandlerError(conn, handlerError)
-			return
-		}
-	}
-
-	headers := response.GetDefaultHeaders(handlerBuffer.Len())
-
-	err = response.WriteStatusLine(conn, response.OK)
-	if err != nil {
-		log.Println("error writing status line:", err)
-		return
-	}
-
-	err = response.WriteHeaders(conn, headers)
-	if err != nil {
-		log.Println("error writing headers:", err)
-		return
-	}
-
-	err = response.WriteBody(conn, handlerBuffer.String())
-	if err != nil {
-		log.Println("error writing body:", err)
-		return
-	}
+	s.handler(responseWriter, r)
+	responseWriter.Finalize()
 }

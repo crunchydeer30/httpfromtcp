@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -28,20 +27,9 @@ func main() {
 	log.Println("Server gracefully stopped")
 }
 
-func handler(w io.Writer, req *request.Request) *server.HandlerError {
-	if req.RequestLine.RequestTarget == "/yourproblem" {
-		return &server.HandlerError{
-			StatusCode: response.BAD_REQUEST,
-			Message:    "Your problem is not my problem\n",
-		}
-	}
-	if req.RequestLine.RequestTarget == "/myproblem" {
-		return &server.HandlerError{
-			StatusCode: response.INTERNAL_SERVER_ERROR,
-			Message:    "Woopsie, my bad\n",
-		}
-	}
-
-	w.Write([]byte("All good, frfr\n\n"))
-	return nil
+func handler(w *response.ResponseWriter, req *request.Request) {
+	w.WriteStatusLine(response.StatusOK)
+	w.Headers.Set("X-Test", "123")
+	w.Headers.Set("Content-Type", "text/html")
+	w.Write([]byte("<html><head><title>200 OK</title></head><body><h1>Success!</h1><p>Your request was an absolute banger.</p></body></html>"))
 }

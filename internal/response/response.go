@@ -1,57 +1,100 @@
 package response
 
 import (
-	"io"
+	"bytes"
+	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
 	"github.com/crunchydeer30/httpfromtcp/internal/headers"
 )
 
-type StatusCode string
+type ResponseWriterState string
 
 const (
-	OK                    StatusCode = "200 OK"
-	BAD_REQUEST           StatusCode = "400 Bad Request"
-	INTERNAL_SERVER_ERROR StatusCode = "500 Internal Server Error"
+	WaitingForStatusLine ResponseWriterState = "WaitingForStatusLine"
+	WaitingForHeaders    ResponseWriterState = "WaitingForHeaders"
+	WaitingForBody       ResponseWriterState = "WaitingForBody"
 )
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
-	switch statusCode {
-	case OK, BAD_REQUEST, INTERNAL_SERVER_ERROR:
-		_, err := w.Write([]byte("HTTP/1.1 " + string(statusCode) + "\r\n"))
-		if err != nil {
-			return err
-		}
-		return nil
-	default:
-		return nil
+type ResponseWriter struct {
+	conn           net.Conn
+	Headers        headers.Headers
+	statusWritten  bool
+	headersWritten bool
+	bodyBuffer     *bytes.Buffer
+}
+
+func NewResponseWriter(conn net.Conn) *ResponseWriter {
+	return &ResponseWriter{
+		bodyBuffer:     bytes.NewBuffer([]byte{}),
+		conn:           conn,
+		statusWritten:  false,
+		headersWritten: false,
+		Headers:        headers.NewHeaders(),
 	}
 }
 
-func GetDefaultHeaders(contentLen int) headers.Headers {
-	headers := headers.NewHeaders()
-	headers.Set("Content-Length", strconv.Itoa(contentLen))
-	headers.Set("Connection", "close")
-	headers.Set("Content-Type", "text/plain")
-	return headers
+func (w *ResponseWriter) WriteStatusLine(statusCode StatusCode) error {
+	if w.statusWritten {
+		return fmt.Errorf("status line already written")
+	}
+
+	_, err := w.conn.Write([]byte("HTTP/1.1 " + statusCode.String() + " " + statusCode.StatusText() + "\r\n"))
+	if err != nil {
+		return err
+	}
+
+	w.statusWritten = true
+	return nil
 }
 
-func WriteHeaders(w io.Writer, headers headers.Headers) error {
-	for k, v := range headers {
+func (w *ResponseWriter) WriteHeaders() error {
+	if w.headersWritten {
+		return fmt.Errorf("headers already sent")
+	}
+
+	for k, v := range w.Headers {
 		values := strings.Split(v, ",")
 		for _, val := range values {
-			_, err := w.Write([]byte(k + ": " + val + "\r\n"))
+			_, err := w.conn.Write([]byte(k + ": " + val + "\r\n"))
 			if err != nil {
 				return err
 			}
 		}
 	}
-	_, err := w.Write([]byte("\r\n"))
+	_, err := w.conn.Write([]byte("\r\n"))
+	if err != nil {
+		return err
+	}
+
+	w.headersWritten = true
+	return nil
+}
+
+func (w *ResponseWriter) Write(p []byte) error {
+	w.bodyBuffer.Write(p)
+	w.Headers.Replace("Content-Length", strconv.Itoa(w.bodyBuffer.Len()))
+	return nil
+}
+
+func (w *ResponseWriter) Finalize() error {
+	w.WriteStatusLine(200)
+	w.SetDefaultHeaders(w.bodyBuffer.Len())
+	w.WriteHeaders()
+	_, err := w.conn.Write(w.bodyBuffer.Bytes())
 	return err
 }
 
-func WriteBody(w io.Writer, body string) error {
-	_, err := w.Write([]byte(body))
-	return err
+func (w *ResponseWriter) SetDefaultHeaders(contentLen int) {
+	if w.Headers.Get("Content-Length") == "" {
+		w.Headers.Set("Content-Length", "0")
+	}
+	if w.Headers.Get("Connection") == "" {
+		w.Headers.Set("Connection", "close")
+	}
+	if w.Headers.Get("Content-Type") == "" {
+		w.Headers.Set("Content-Type", "text/plain")
+	}
 }

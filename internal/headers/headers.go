@@ -30,6 +30,11 @@ func (h Headers) Set(key string, value string) {
 	}
 }
 
+func (h Headers) Replace(key string, value string) {
+	k := strings.ToLower(key)
+	h[k] = value
+}
+
 func NewHeaders() Headers {
 	return make(Headers)
 }
