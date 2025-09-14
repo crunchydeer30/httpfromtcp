@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -20,7 +21,7 @@ import (
 const port = 42069
 
 func main() {
-	server, err := server.Serve(port, streamHandler)
+	server, err := server.Serve(port, handler)
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
@@ -38,6 +39,19 @@ func handler(w *response.ResponseWriter, req *request.Request) {
 	w.Headers.Set("X-Test", "123")
 	w.Headers.Set("Content-Type", "text/html")
 	w.Write([]byte("<html><head><title>200 OK</title></head><body><h1>Success!</h1><p>Your request was an absolute banger.</p></body></html>"))
+}
+
+func binaryHandler(w *response.ResponseWriter, req *request.Request) {
+	data, err := os.ReadFile("assets/vim.mp4")
+	if err != nil {
+		w.WriteStatusLine(response.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	fmt.Println("data len:", len(data))
+	w.WriteStatusLine(response.StatusOK)
+	w.Headers.Set("Content-Type", "video/mp4")
+	w.Write(data)
 }
 
 func streamHandler(w *response.ResponseWriter, req *request.Request) {
