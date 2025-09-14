@@ -81,6 +81,10 @@ func (w *ResponseWriter) Write(p []byte) error {
 	return nil
 }
 
+func (w *ResponseWriter) WriteTrailers(h headers.Headers) {
+
+}
+
 func (w *ResponseWriter) Finalize() error {
 	w.WriteStatusLine(200)
 	w.SetDefaultHeaders(w.bodyBuffer.Len())
@@ -106,12 +110,12 @@ func (w *ResponseWriter) SetDefaultHeaders(contentLen int) {
 }
 
 func (w *ResponseWriter) WriteChunkedBody(p []byte) (int, error) {
-	w.Write([]byte(fmt.Sprintf("%x\r\n%s\r\n", len(p), p)))
+	n, _ := w.conn.Write([]byte(fmt.Sprintf("%x\r\n%s\r\n", len(p), p)))
 
-	return len(p), nil
+	return n, nil
 }
 
 func (w *ResponseWriter) WriteChunkedBodyDone() (int, error) {
-	w.Write([]byte("0\r\n\r\n"))
+	w.conn.Write([]byte("0\r\n\r\n"))
 	return 0, nil
 }

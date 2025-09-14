@@ -48,9 +48,10 @@ func streamHandler(w *response.ResponseWriter, req *request.Request) {
 	w.WriteStatusLine(response.StatusOK)
 	w.Headers.Set("Transfer-Encoding", "chunked")
 	w.Headers.Replace("content-type", "application/json")
+	w.WriteHeaders()
 
 	for {
-		data := make([]byte, 32)
+		data := make([]byte, 1024)
 		_, err := res.Body.Read(data)
 		if err != nil {
 			if err == io.EOF {

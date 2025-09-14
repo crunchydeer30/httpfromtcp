@@ -70,5 +70,9 @@ func (s *Server) handle(conn net.Conn) {
 
 	s.handler(responseWriter, r)
 
+	isChunked := r.Headers.Get("Transfer-Encoding") == "chunked"
+	if isChunked {
+		return
+	}
 	responseWriter.Finalize()
 }
