@@ -1,11 +1,20 @@
-# httpfromtcp
+### HTTP/1.1 Server from Scratch (from raw TCP) — Learning Project
 
-A learning project implementing HTTP 1.1 functionality from scratch using Go's TCP primitives.
+Implementing core pieces of HTTP/1.1 directly over TCP sockets in Go. Built to practice Go, networking fundamentals, and the HTTP protocol without relying on the standard `net/http` server.
 
-## Features
+### Learning goals
+- Go networking with `net`: TCP listeners, `net.Conn`, read/write semantics
+- Incremental stream parsing and state machines (request line → headers → body)
+- HTTP/1.1 basics: CRLF framing, request line, header rules, Content-Length
+- Response writing: status line, headers, body, and basic chunked transfer encoding
+- Concurrency with goroutines per connection and graceful shutdown
+- Test-Driven development
+- Error handling and tests for parsers
 
-- HTTP/1.1 request parsing (method, headers, body)
-- HTTP response building with status codes
-- Header management
-- Content-Length and Transfer-Encoding support
-- Chunked transfer encoding
+### What it does
+- Parses HTTP/1.1 requests: method, target, version, headers, and optional body (Content‑Length)
+- Validates request line, methods, version, and header syntax; surfaces precise errors
+- Builds HTTP responses over raw `net.Conn` with sensible defaults (Content‑Length, Connection)
+- Supports writing chunked bodies and trailers helpers
+- Minimal TCP HTTP server
+
