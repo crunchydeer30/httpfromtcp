@@ -1,4 +1,4 @@
-### HTTP/1.1 Server from Scratch — Learning Project
+### HTTP/1.1 Server from Scratch - Learning Project
 
 Implementing core pieces of HTTP/1.1 directly over TCP sockets in Go. Built to practice Go, networking fundamentals, and the HTTP protocol without relying on the standard `net/http` server.
 
